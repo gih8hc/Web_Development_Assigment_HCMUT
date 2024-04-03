@@ -2,13 +2,11 @@ import sys
 from PyQt5.QtWidgets import QMainWindow, QApplication, QPushButton
 from PyQt5.QtCore import pyqtSlot, QFile, QTextStream
 from Object3d import GLWidget
-from PyQt5 import QtCore    
-from PyQt5 import QtWidgets       
+from PyQt5 import QtCore
+from PyQt5 import QtWidgets
 from sidebar_ui import Ui_MainWindow
-import sys                   
+import sys
 
-from OpenGL.arrays import vbo
-import numpy as np
 
 
 
@@ -30,6 +28,8 @@ class MainWindow(QMainWindow):
         self.ui.stackedWidget.setCurrentIndex(0)
         self.ui.home_btn_2.setChecked(True)
         self.initGL()
+        self.addItemRadar()
+        self.addItemFile()
         timer = QtCore.QTimer(self)
         timer.setInterval(20)   # period, in milliseconds
         timer.timeout.connect(self.glWidget.updateGL)
@@ -49,21 +49,21 @@ class MainWindow(QMainWindow):
     def on_stackedWidget_currentChanged(self, index):
         btn_list = self.ui.icon_only_widget.findChildren(QPushButton) \
                     + self.ui.full_menu_widget.findChildren(QPushButton)
-        
+
         for btn in btn_list:
             if index in [5, 6]:
                 btn.setAutoExclusive(False)
                 btn.setChecked(False)
             else:
                 btn.setAutoExclusive(True)
-            
+
     ## functions for changing menu page
     def on_home_btn_1_toggled(self):
         self.ui.stackedWidget.setCurrentIndex(0)
-    
+
     def on_home_btn_2_toggled(self):
         self.ui.stackedWidget.setCurrentIndex(0)
-        
+
     def on_dashborad_btn_1_toggled(self):
         self.ui.stackedWidget.setCurrentIndex(1)
 
@@ -88,22 +88,37 @@ class MainWindow(QMainWindow):
     def on_customers_btn_2_toggled(self):
         self.ui.stackedWidget.setCurrentIndex(4)
 
+    def addItemRadar(self):
+        self.ui.radarBox.clear()
+        for i in range(0,10):
+            opt = "test add item " + str(i)
+            self.ui.radarBox.addItem(opt)
+        self.ui.radarBox.setCurrentIndex(-1)
+    def addItemFile(self):
+        # self.ui.dateBox.setEditable(True)
+        # self.ui.dateBox.setPlaceholderText("dd/mm/yy");
+        # self.ui.dateBox.setCurrentIndex(-1);
+
+        self.ui.fileBox.clear()
+        self.ui.fileBox.addItem("All files")
+        for i in range(0,10):
+            opt = "test add item " + str(i)
+            self.ui.fileBox.addItem(opt)
+
     def initGL(self):
-        self.ui.gridLayout_3.removeWidget(self.ui.page_2)
-        self.ui.gridLayout_3.removeWidget(self.ui.label_5)
+        self.ui.verticalLayout_6.removeWidget(self.ui.openGLWidget)
+        # self.ui.gridLayout_3.removeWidget(self.ui.label_5)
         self.glWidget = GLWidget(self)
-        self.ui.gridLayout_3.addWidget(self.glWidget)
-        sliderX = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        sliderX.valueChanged.connect(lambda val: self.glWidget.setRotX(val))
+        self.ui.verticalLayout_6.insertWidget(1, self.glWidget)
 
-        sliderY = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        sliderY.valueChanged.connect(lambda val: self.glWidget.setRotY(val))
 
-        sliderZ = QtWidgets.QSlider(QtCore.Qt.Horizontal)
-        sliderZ.valueChanged.connect(lambda val: self.glWidget.setRotZ(val))     
-        self.ui.gridLayout_3.addWidget(sliderX)
-        self.ui.gridLayout_3.addWidget(sliderY)
-        self.ui.gridLayout_3.addWidget(sliderZ)
+        self.ui.horizontalSlider.valueChanged.connect(lambda val: self.glWidget.setRotX(val))
+
+        self.ui.horizontalSlider_2.valueChanged.connect(lambda val: self.glWidget.setRotY(val))
+
+        self.ui.horizontalSlider_3.valueChanged.connect(lambda val: self.glWidget.setRotZ(val))
+
+
 
 def loadStyle(QApplication):
     """
@@ -122,6 +137,3 @@ if __name__ == "__main__":
     window = MainWindow()
     window.show()
     sys.exit(app.exec())
-
-
-
