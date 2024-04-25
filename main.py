@@ -1,18 +1,18 @@
 import sys
-from PyQt5.QtWidgets import QMainWindow, QApplication, QPushButton, QFileDialog, QMessageBox
-from PyQt5.QtCore import pyqtSlot, QFile, QTextStream
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QIntValidator
-from Object3d import GLWidget
-from PyQt5 import QtCore
-from PyQt5 import QtWidgets
-from Frontend import Ui_MainWindow
-import sys
 import numpy as np
+
+import PyQt5
+from PyQt5.QtWidgets import QMainWindow, QApplication, QPushButton, QFileDialog, QMessageBox
+from PyQt5.QtCore import QFile, QTextStream, Qt
+from PyQt5.QtGui import QIntValidator, QPixmap
+
+from Object3d import GLWidget
+from Frontend import Ui_MainWindow
 from Radar import DataManager
-from Config import SECOND, TICK
 from Utils import folderEmpty
+from Config import SECOND, TICK
 from messageBox import quitQuestionBox, errorBox
+
 # Set high DPI scaling attributes
 QApplication.setAttribute(Qt.AA_EnableHighDpiScaling)
 QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
@@ -44,11 +44,20 @@ class MainWindow(QMainWindow):
         self.zoom_factor = 0
         self.last_pos = None
         self.mouse_x = 0
-        self.mouse_y = 0 
+        self.mouse_y = 0
+
+        # init OpenGL Widget
         self.initGL()
+
+        # init HomePage
         self.initHomePage() 
 
-        #! add item to drop down 3d
+        # init 2D Page
+        # self.init2DView() 
+
+        # init Pro view
+        self.initProView()
+        # add item for drop down 3d
         self.addItemRadar()
         self.addItemDate()
         self.addItemMode()
@@ -64,17 +73,23 @@ class MainWindow(QMainWindow):
         self.ui.timerInput.setValidator(timerValidator)
         self.ui.timerInput.setText("0")
 
+
+        self.ui.threshold_pro.setValidator(thresholdValidator)
+        self.ui.threshold_pro.setText(str(self.glWidget.threshold))
+        self.ui.timerInput_pro.setValidator(timerValidator)
+        self.ui.timerInput_pro.setText("0")
+
         # timers
-        mainTimer = QtCore.QTimer(self)
+        mainTimer = PyQt5.QtCore.QTimer(self)
         mainTimer.setInterval(int(TICK))   # period, in milliseconds
         mainTimer.timeout.connect(self.glWidget.updateGL)
         mainTimer.start()
 
-        self.switchFrameTimer = QtCore.QTimer(self)
+        self.switchFrameTimer = PyQt5.QtCore.QTimer(self)
         self.switchFrameTimer.timeout.connect(self.goNextFile)
         self.switchFrameTimer.stop()
 
-        self.errorTimer = QtCore.QTimer(self)
+        self.errorTimer = PyQt5.QtCore.QTimer(self)
         self.errorTimer.setInterval(5 * SECOND) 
         self.errorTimer.timeout.connect(self.clearError)
         self.errorTimer.stop()
@@ -85,9 +100,7 @@ class MainWindow(QMainWindow):
         self.ui.page_2.hideEvent = lambda event: self.page2Disconnect(event)
         self.page_2Connected = False
 
-        self.last_pos = None
-        self.mouse_x = 0
-        self.mouse_y = 0
+
     def closeEvent(self, event):
         if quitQuestionBox() == QMessageBox.Cancel:
             event.ignore()
@@ -98,6 +111,8 @@ class MainWindow(QMainWindow):
       if not self.page_2Connected:
         self.ui.threshold.textChanged.connect(self.getThreshold)
         self.ui.timerInput.textChanged.connect(self.getSwichFrameTimer)
+        self.ui.threshold_pro.textChanged.connect(self.getThreshold)
+        self.ui.timerInput_pro.textChanged.connect(self.getSwichFrameTimer)
         self.ui.fileBox.currentIndexChanged.connect(self.getFile)
         self.ui.radarBox.currentIndexChanged.connect(self.getRadar)
         self.ui.modeBox.currentIndexChanged.connect(self.getMode)
@@ -115,17 +130,21 @@ class MainWindow(QMainWindow):
         self.ui.dateBox.currentIndexChanged.disconnect(self.getDate)
         self.ui.clutterFilterToggle.stateChanged.disconnect(self.getClutterFilter)
         self.page_2Connected = False
+
     def keyPressEvent(self, event):
-        if event.key()== QtCore.Qt.Key_3:
+        if event.key()== PyQt5.QtCore.Qt.Key_4:
+            self.ui.other_1.setChecked(True)
+            self.ui.other_2.setChecked(True)
+        elif event.key()== PyQt5.QtCore.Qt.Key_3:
             self.ui.view3d_1.setChecked(True)
             self.ui.view3d_2.setChecked(True)
-        elif event.key()== QtCore.Qt.Key_2:
+        elif event.key()== PyQt5.QtCore.Qt.Key_2:
             self.ui.view2d_1.setChecked(True)
             self.ui.view2d_2.setChecked(True)
-        elif event.key()== QtCore.Qt.Key_1:
+        elif event.key()== PyQt5.QtCore.Qt.Key_1:
             self.ui.home_btn_1.setChecked(True)
             self.ui.home_btn_1.setChecked(True)
-        elif event.key()== QtCore.Qt.Key_Escape:
+        elif event.key()== PyQt5.QtCore.Qt.Key_Escape:
             quitQuestionBox()
         else:
             event.ignore()
@@ -157,7 +176,7 @@ class MainWindow(QMainWindow):
                 scale ability: 0.25 -> 25
             held left mouse button to move object
         """
-        if self.ui.stackedWidget.currentIndex() == 1:
+        if self.ui.stackedWidget_2.currentIndex() == 0 or self.ui.stackedWidget_2.currentIndex() == 2:
             try:
                 delta = event.angleDelta().y()
                 self.zoom_factor += (delta and delta // abs(delta))
@@ -225,20 +244,26 @@ class MainWindow(QMainWindow):
         self.ui.slider_3d_y.setEnabled(True)
 
     def on_view3d_2_toggled(self):
+        self.ui.scrollArea_4.takeWidget()
+        self.ui.scrollArea.setWidget(self.glWidget)
         self.ui.stackedWidget.setCurrentIndex(1)
         self.ui.stackedWidget_2.setCurrentIndex(0)
         self.ui.labelPage.setText("3D View")
         self.ui.slider_3d_x.setEnabled(True)
         self.ui.slider_3d_y.setEnabled(True)
     def on_view2d_1_toggled(self):
+        self.ui.scrollArea_4.takeWidget()
+        self.ui.scrollArea.setWidget(self.glWidget)
         self.ui.stackedWidget.setCurrentIndex(1)
         self.ui.stackedWidget_2.setCurrentIndex(1)
         self.ui.labelPage.setText("2D View")
 
-        self.ui.slider_3d_x.setDisabled(True)
-        self.ui.slider_3d_y.setDisabled(True)
+        # self.ui.slider_3d_x.setDisabled(True)
+        # self.ui.slider_3d_y.setDisabled(True)
 
     def on_view2d_2_toggled(self):
+        self.ui.scrollArea.takeWidget()
+        self.ui.scrollArea_4.setWidget(self.glWidget)
         self.ui.stackedWidget.setCurrentIndex(1)
         self.ui.stackedWidget_2.setCurrentIndex(1)
         self.ui.labelPage.setText("2D View")
@@ -247,13 +272,17 @@ class MainWindow(QMainWindow):
         self.ui.slider_3d_y.setDisabled(True)
 
     def on_other_1_toggled(self):
-        self.ui.stackedWidget.setCurrentIndex(2)
-        self.ui.labelPage.setText("About")
+        self.ui.scrollArea.takeWidget()
+        self.ui.scrollArea_4.setWidget(self.glWidget)
+        self.ui.stackedWidget.setCurrentIndex(1)
+        self.ui.stackedWidget_2.setCurrentIndex(2)
+        self.ui.labelPage.setText("Pro View")
 
 
     def on_other_2_toggled(self, ):
-        self.ui.stackedWidget.setCurrentIndex(2)
-        self.ui.labelPage.setText("About")
+        self.ui.stackedWidget.setCurrentIndex(1)
+        self.ui.stackedWidget_2.setCurrentIndex(2)
+        self.ui.labelPage.setText("Pro View")
 
 #
 #     def on_customers_btn_1_toggled(self):
@@ -369,7 +398,6 @@ class MainWindow(QMainWindow):
     def getThreshold(self):
         if self.ui.threshold.text():
             print("Filter threshold with value: " + self.ui.threshold.text())
-            errorBox(self.ui.threshold.text())
             self.glWidget.update(threshold=int(self.ui.threshold.text()))
         else:
             self.glWidget.update(threshold=0)
@@ -385,11 +413,26 @@ class MainWindow(QMainWindow):
           self.ui.timerInput.setText("0")
           self.switchFrameTimer.stop()
 
+    #write a fuction init 2d view add image to label: ui.view_2d_label
+    def init2DView(self): 
+      '''create mode box for user choosing mode'''
+      self.glWidget.radar.plot(mode="wrl_plot_scan_strategy", sweep=1)
+      pixmap = QPixmap('temp.jpg')
+      self.ui.view_2d_label.setPixmap(pixmap)
+      self.ui.view_2d_label.setScaledContents(True)
+    
     def initGL(self):
 
-        sizePolicy = QtWidgets.QSizePolicy(QtWidgets.QSizePolicy.Expanding, QtWidgets.QSizePolicy.Expanding)
+        sizePolicy = PyQt5.QtWidgets.QSizePolicy(PyQt5.QtWidgets.QSizePolicy.Expanding, PyQt5.QtWidgets.QSizePolicy.Expanding)
+
+        # ''' specified GL version: core 330 '''
+        # glformat = PyQt5.QtOpenGL.QGLFormat()
+        # glformat.setVersion(3, 3)
+        # glformat.setProfile(PyQt5.QtOpenGL.QGLFormat.CoreProfile)
 
         self.glWidget = GLWidget(self)
+        
+
         self.glWidget.setSizePolicy(sizePolicy)
         self.ui.scrollArea.setWidget(self.glWidget)
         
@@ -409,7 +452,42 @@ class MainWindow(QMainWindow):
         self.ui.nextFile.clicked.connect(self.goNextFile)
 
         self.ui.resetView.clicked.connect(self.reset3DView)
+    def initProView(self):
+        self.ui.scrollArea_4.setMinimumHeight(int(self.ui.stackedWidget_2.height() * 0.5))
+        self.ui.scrollArea_4.setMinimumWidth(int(self.ui.page_3.width() * 0.75))
+        self.ui.label2d_pro.setMinimumWidth(int(self.ui.page_3.width() * 0.25))
+        self.ui.scrollArea.setWidget(self.glWidget)
 
+        # 2D 
+        source = 'temp.jpg'
+        pixmap = QPixmap(source)
+        self.ui.label2d_pro.setPixmap(pixmap)
+        self.ui.label2d_pro.setScaledContents(True)
+        self.addInfor()
+        self.addExtraInfor()
+        self.addStormList()
+        self.ui.lat_pro.setText(f'12.00')
+        self.ui.long_pro.setText(f'24.00')
+
+        self.ui.slider_pro_x.valueChanged.connect(self.updateSliderX)
+        self.ui.slider_pro_y.valueChanged.connect(self.updateSliderY)
+        self.ui.slider_pro_z.valueChanged.connect(self.updateSliderZ)
+
+        self.ui.slider_pro_x.setMaximum(115)
+        self.ui.slider_pro_y.setMaximum(115)
+        self.ui.slider_pro_z.setMaximum(115)
+    def addInfor(self):
+        radarName = "NhaBe"
+        entries = ['This is other information box',f'Radar: {radarName}', 'two', 'three']
+        self.ui.otherIn4_pro.addItems(entries)
+    def addExtraInfor(self):
+        radarName = "NhaBe"
+        entries = ['This is extra information box',f'Radar: {radarName}', 'two', 'three']
+        self.ui.extraInfo_pro.addItems(entries)
+    def addStormList(self):
+        entries = [f'storm 1: theshold...', 'storm 1: theshold...', 'storm 1: theshold...']
+        self.ui.stromList.addItems(entries)
+        self.ui.stromList.setCurrentIndex(-1)
     def reset3DView(self):
         """
         Reset 3D view
@@ -449,7 +527,6 @@ class MainWindow(QMainWindow):
         tmp_value = min(tmp_value, 360)
         self.ui.y_value.setText(str(int(tmp_value)) + "°")
 
-
     def updateSliderZ(self, val):
         self.glWidget.setRotZ(val)
         tmp_value = val * np.pi
@@ -486,7 +563,6 @@ class MainWindow(QMainWindow):
         self.ui.errorBox.clear()
         self.errorTimer.stop()
 
-
     def clearPage2Box(self, radarName = False, date = False, mode = False, files = False):
       if radarName:
         self.ui.radarBox.clear()
@@ -499,13 +575,14 @@ class MainWindow(QMainWindow):
         self.ui.fileBox.clear()
       elif files:
         self.ui.fileBox.clear()
+    
 def loadStyle(QApplication):
     """
     load style file for application
     Args:
         QApplication (QtGui.QGuiApplication): our application
     """
-    style_file = QFile("./style/style.css")
+    style_file = QFile("./style/style.qss")
     style_file.open(QFile.ReadOnly | QFile.Text)
     style_stream = QTextStream(style_file)
     QApplication.setStyleSheet(style_stream.readAll())
@@ -520,7 +597,7 @@ if __name__ == "__main__":
     window = MainWindow()
 
     # Window run
-    window.show()
+    window.showMaximized()
 
     # Exit
     sys.exit(app.exec())
